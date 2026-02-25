@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="tk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Dil Öwrenmek</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin-styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="logo-icon">📚</span>
+                <span class="logo-text">Admin Panel</span>
+            </div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-page="dashboard">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-page="languages">
+                <span class="nav-icon">🌐</span>
+                <span class="nav-text">Diller</span>
+            </a>
+            <a href="#" class="nav-item" data-page="lessons">
+                <span class="nav-icon">📖</span>
+                <span class="nav-text">Sapaklar</span>
+            </a>
+            <a href="#" class="nav-item" data-page="exercises">
+                <span class="nav-icon">✏️</span>
+                <span class="nav-text">Maşklar</span>
+            </a>
+            <a href="#" class="nav-item" data-page="users">
+                <span class="nav-icon">👥</span>
+                <span class="nav-text">Ulanyjylar</span>
+            </a>
+            <a href="#" class="nav-item" data-page="vocabulary">
+                <span class="nav-icon">📝</span>
+                <span class="nav-text">Sözlük</span>
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="admin-info">
+                <div class="admin-avatar">A</div>
+                <div class="admin-details">
+                    <div class="admin-name">Admin</div>
+                    <div class="admin-role">Administrator</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="page-title">Dashboard</h1>
+            </div>
+            <div class="header-right">
+                <div class="search-box">
+                    <input type="text" placeholder="Gözle..." class="search-input">
+                    <span class="search-icon">🔍</span>
+                </div>
+                <button class="notification-btn">
+                    <span>🔔</span>
+                    <span class="notification-badge">3</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page-content active">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">🌐</div>
+                    <div class="stat-details">
+                        <div class="stat-value" id="stat-languages">6</div>
+                        <div class="stat-label">Diller</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">📖</div>
+                    <div class="stat-details">
+                        <div class="stat-value" id="stat-lessons">7</div>
+                        <div class="stat-label">Sapaklar</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">✏️</div>
+                    <div class="stat-details">
+                        <div class="stat-value" id="stat-exercises">15</div>
+                        <div class="stat-label">Maşklar</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">👥</div>
+                    <div class="stat-details">
+                        <div class="stat-value" id="stat-users">0</div>
+                        <div class="stat-label">Ulanyjylar</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Soňky işler</h2>
+                    </div>
+                    <div class="activity-list" id="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon">📖</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Täze sapak goşuldy</div>
+                                <div class="activity-time">5 minut öň</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">✏️</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Maşk üýtgedildi</div>
+                                <div class="activity-time">1 sagat öň</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Languages Page -->
+        <div id="languages-page" class="page-content">
+            <div class="page-header">
+                <h2>Diller</h2>
+                <button class="btn btn-primary" onclick="showAddLanguageModal()">
+                    <span>➕</span> Täze dil goş
+                </button>
+            </div>
+            
+            <div class="card">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Flag</th>
+                                <th>Ady</th>
+                                <th>Kod</th>
+                                <th>Beýany</th>
+                                <th>Hereketler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="languages-table-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lessons Page -->
+        <div id="lessons-page" class="page-content">
+            <div class="page-header">
+                <h2>Sapaklar</h2>
+                <button class="btn btn-primary" onclick="showAddLessonModal()">
+                    <span>➕</span> Täze sapak goş
+                </button>
+            </div>
+            
+            <div class="filters">
+                <select class="filter-select" id="lesson-language-filter" onchange="filterLessons()">
+                    <option value="">Ähli diller</option>
+                </select>
+                <select class="filter-select" id="lesson-level-filter" onchange="filterLessons()">
+                    <option value="">Ähli derejeleri</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                </select>
+            </div>
+            
+            <div class="card">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Ady</th>
+                                <th>Dil</th>
+                                <th>Dereje</th>
+                                <th>Tertip</th>
+                                <th>Maşklar</th>
+                                <th>Hereketler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lessons-table-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exercises Page -->
+        <div id="exercises-page" class="page-content">
+            <div class="page-header">
+                <h2>Maşklar</h2>
+                <button class="btn btn-primary" onclick="showAddExerciseModal()">
+                    <span>➕</span> Täze maşk goş
+                </button>
+            </div>
+            
+            <div class="filters">
+                <select class="filter-select" id="exercise-lesson-filter" onchange="filterExercises()">
+                    <option value="">Ähli sapaklar</option>
+                </select>
+                <select class="filter-select" id="exercise-type-filter" onchange="filterExercises()">
+                    <option value="">Ähli görnüşler</option>
+                    <option value="multiple_choice">Multiple Choice</option>
+                    <option value="translation">Translation</option>
+                    <option value="fill_blank">Fill Blank</option>
+                </select>
+            </div>
+            
+            <div class="card">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Ady</th>
+                                <th>Sapak</th>
+                                <th>Görnüş</th>
+                                <th>Kynçylyk</th>
+                                <th>Ballar</th>
+                                <th>Hereketler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exercises-table-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Page -->
+        <div id="users-page" class="page-content">
+            <div class="page-header">
+                <h2>Ulanyjylar</h2>
+            </div>
+            
+            <div class="card">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Ene dili</th>
+                                <th>Hasaba alnan</th>
+                                <th>Hereketler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vocabulary Page -->
+        <div id="vocabulary-page" class="page-content">
+            <div class="page-header">
+                <h2>Sözlük</h2>
+            </div>
+            
+            <div class="card">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Söz</th>
+                                <th>Terjime</th>
+                                <th>Dil</th>
+                                <th>Ulanyjy</th>
+                                <th>Ussatlyk</th>
+                                <th>Hereketler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vocabulary-table-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Add/Edit Language Modal -->
+    <div id="language-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="language-modal-title">Täze dil goş</h3>
+                <button class="modal-close" onclick="closeModal('language-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Diliň ady</label>
+                    <input type="text" id="language-name" class="form-input" placeholder="Ispança">
+                </div>
+                <div class="form-group">
+                    <label>Kod</label>
+                    <input type="text" id="language-code" class="form-input" placeholder="es">
+                </div>
+                <div class="form-group">
+                    <label>Flag emoji</label>
+                    <input type="text" id="language-flag" class="form-input" placeholder="🇪🇸">
+                </div>
+                <div class="form-group">
+                    <label>Beýan</label>
+                    <textarea id="language-description" class="form-textarea" rows="3" placeholder="Dil barada maglumat"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('language-modal')">Ýatyr</button>
+                <button class="btn btn-primary" onclick="saveLanguage()">Ýatda sakla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Lesson Modal -->
+    <div id="lesson-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="lesson-modal-title">Täze sapak goş</h3>
+                <button class="modal-close" onclick="closeModal('lesson-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sapagyň ady</label>
+                        <input type="text" id="lesson-title" class="form-input" placeholder="Salamlaşma">
+                    </div>
+                    <div class="form-group">
+                        <label>Dil</label>
+                        <select id="lesson-language" class="form-select">
+                            <!-- Filled by JS -->
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Dereje</label>
+                        <select id="lesson-level" class="form-select">
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertip</label>
+                        <input type="number" id="lesson-order" class="form-input" value="1">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Beýan</label>
+                    <textarea id="lesson-description" class="form-textarea" rows="2"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Mazmun (JSON format)</label>
+                    <textarea id="lesson-content" class="form-textarea" rows="10" placeholder='{"sections": []}'></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('lesson-modal')">Ýatyr</button>
+                <button class="btn btn-primary" onclick="saveLesson()">Ýatda sakla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Exercise Modal -->
+    <div id="exercise-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="exercise-modal-title">Täze maşk goş</h3>
+                <button class="modal-close" onclick="closeModal('exercise-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sapak</label>
+                        <select id="exercise-lesson" class="form-select">
+                            <!-- Filled by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Görnüş</label>
+                        <select id="exercise-type" class="form-select" onchange="updateExerciseFields()">
+                            <option value="multiple_choice">Multiple Choice</option>
+                            <option value="translation">Translation</option>
+                            <option value="fill_blank">Fill Blank</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Ady</label>
+                    <input type="text" id="exercise-title" class="form-input">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Kynçylyk (1-5)</label>
+                        <input type="number" id="exercise-difficulty" class="form-input" value="1" min="1" max="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Ballar</label>
+                        <input type="number" id="exercise-points" class="form-input" value="10">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Sorag</label>
+                    <textarea id="exercise-question" class="form-textarea" rows="3"></textarea>
+                </div>
+                
+                <div id="exercise-options-group" class="form-group">
+                    <label>Wariantlar (her setirde bir)</label>
+                    <textarea id="exercise-options" class="form-textarea" rows="4" placeholder="Salam&#10;Hoş gal&#10;Sag bol&#10;Ertiriňiz haýyrly"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Dogry jogap</label>
+                    <input type="text" id="exercise-answer" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label>Ýardam</label>
+                    <input type="text" id="exercise-hint" class="form-input">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('exercise-modal')">Ýatyr</button>
+                <button class="btn btn-primary" onclick="saveExercise()">Ýatda sakla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="{{ url_for('static', filename='admin-script.js') }}"></script>
+</body>
+</html>
