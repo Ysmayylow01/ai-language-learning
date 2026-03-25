@@ -1,669 +1,576 @@
-// Admin Panel JavaScript
-// Backend API integration we CRUD operations
+// ====================================================
+//  Admin Panel - Language Learning App
+//  admin-script.js
+// ====================================================
 
-const API_BASE_URL = 'http://localhost:5000';
-let currentData = {
-    languages: [],
-    lessons: [],
-    exercises: [],
-    users: [],
-    vocabulary: []
-};
-let editingItem = null;
+const API = '';          // same-origin
+let allLanguages = [];
+let allLessons    = [];
+let allExercises  = [];
+let editingId     = null;   // currently editing record id
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    setupNavigation();
-    loadAllData();
-    updateExerciseFields(); // Initialize exercise form
+// ──────────────────────────────────────────────
+//  BOOTSTRAP
+// ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+    initNav();
+    await loadAll();
+    renderDashboard();
 });
 
-// Navigation
-function setupNavigation() {
-    const navItems = document.querySelectorAll('.nav-item');
-    navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
+async function loadAll() {
+    await Promise.all([
+        fetchLanguages(),
+        fetchLessons(),
+        fetchExercises(),
+    ]);
+}
+
+// ──────────────────────────────────────────────
+//  NAVIGATION
+// ──────────────────────────────────────────────
+function initNav() {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', e => {
             e.preventDefault();
             const page = item.dataset.page;
-            navigateTo(page);
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            item.classList.add('active');
+            document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${page}-page`).classList.add('active');
+            document.querySelector('.page-title').textContent =
+                item.querySelector('.nav-text').textContent;
+
+            // Lazy-load page data
+            if (page === 'languages')  renderLanguagesTable();
+            if (page === 'lessons')    renderLessonsPage();
+            if (page === 'exercises')  renderExercisesPage();
+            if (page === 'users')      renderUsersPage();
+            if (page === 'vocabulary') renderVocabularyPage();
         });
     });
 }
 
-function navigateTo(page) {
-    // Update active nav
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    document.querySelector(`[data-page="${page}"]`).classList.add('active');
-    
-    // Update page title
-    const titles = {
-        'dashboard': 'Dashboard',
-        'languages': 'Diller',
-        'lessons': 'Sapaklar',
-        'exercises': 'Maşklar',
-        'users': 'Ulanyjylar',
-        'vocabulary': 'Sözlük'
-    };
-    document.querySelector('.page-title').textContent = titles[page];
-    
-    // Show page
-    document.querySelectorAll('.page-content').forEach(content => {
-        content.classList.remove('active');
-    });
-    document.getElementById(`${page}-page`).classList.add('active');
-}
-
-// Load All Data
-async function loadAllData() {
+// ──────────────────────────────────────────────
+//  API HELPERS
+// ──────────────────────────────────────────────
+async function apiFetch(url, opts = {}) {
     try {
-        await Promise.all([
-            loadLanguages(),
-            loadLessons(),
-            loadExercises(),
-            loadUsers(),
-            loadVocabulary()
-        ]);
-        updateDashboard();
-    } catch (error) {
-        showToast('Maglumat ýüklenende ýalňyşlyk!', 'error');
+        const res = await fetch(API + url, {
+            headers: { 'Content-Type': 'application/json', ...opts.headers },
+            ...opts,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        return data;
+    } catch (err) {
+        showToast(err.message, 'error');
+        throw err;
     }
 }
 
-// Dashboard
-function updateDashboard() {
-    document.getElementById('stat-languages').textContent = currentData.languages.length;
-    document.getElementById('stat-lessons').textContent = currentData.lessons.length;
-    document.getElementById('stat-exercises').textContent = currentData.exercises.length;
-    document.getElementById('stat-users').textContent = currentData.users.length;
+// ──────────────────────────────────────────────
+//  FETCH DATA
+// ──────────────────────────────────────────────
+async function fetchLanguages() {
+    allLanguages = await apiFetch('/api/languages');
+    populateLanguageSelects();
 }
 
-// ===== LANGUAGES =====
+async function fetchLessons() {
+    // Fetch lessons for every language
+    const results = await Promise.all(
+        allLanguages.map(l => apiFetch(`/api/lessons?language_id=${l.id}`).catch(() => []))
+    );
+    allLessons = results.flat();
+    populateLessonSelects();
+}
 
-async function loadLanguages() {
+async function fetchExercises() {
+    // Fetch exercises for every lesson
+    const results = await Promise.all(
+        allLessons.map(l =>
+            apiFetch(`/api/lessons/${l.id}`)
+                .then(d => (d.exercises || []).map(e => ({ ...e, lesson_title: l.title })))
+                .catch(() => [])
+        )
+    );
+    allExercises = results.flat();
+}
+
+// ──────────────────────────────────────────────
+//  POPULATE SELECTS
+// ──────────────────────────────────────────────
+function populateLanguageSelects() {
+    const opts = allLanguages.map(l => `<option value="${l.id}">${l.flag || ''} ${l.name}</option>`).join('');
+
+    // Filter dropdown on Lessons page
+    const lf = document.getElementById('lesson-language-filter');
+    if (lf) lf.innerHTML = `<option value="">Ähli diller</option>${opts}`;
+
+    // Modal select inside Add Lesson
+    const ls = document.getElementById('lesson-language');
+    if (ls) ls.innerHTML = opts;
+}
+
+function populateLessonSelects() {
+    const opts = allLessons.map(l => `<option value="${l.id}">${l.title}</option>`).join('');
+
+    const ef = document.getElementById('exercise-lesson-filter');
+    if (ef) ef.innerHTML = `<option value="">Ähli sapaklar</option>${opts}`;
+
+    const es = document.getElementById('exercise-lesson');
+    if (es) es.innerHTML = opts;
+}
+
+// ──────────────────────────────────────────────
+//  DASHBOARD
+// ──────────────────────────────────────────────
+async function renderDashboard() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/languages`);
-        currentData.languages = await response.json();
-        renderLanguagesTable();
-        populateLanguageSelects();
-    } catch (error) {
-        console.error('Languages load error:', error);
-    }
+        const stats = await apiFetch('/api/stats');
+        setText('stat-languages',  stats.languages);
+        setText('stat-lessons',    stats.lessons);
+        setText('stat-exercises',  stats.exercises);
+        setText('stat-users',      stats.users);
+    } catch (_) {}
 }
 
+// ──────────────────────────────────────────────
+//  LANGUAGES PAGE
+// ──────────────────────────────────────────────
 function renderLanguagesTable() {
     const tbody = document.getElementById('languages-table-body');
-    tbody.innerHTML = currentData.languages.map(lang => `
+    if (!tbody) return;
+
+    if (!allLanguages.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Dil ýok</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = allLanguages.map(l => `
         <tr>
-            <td>${lang.id}</td>
-            <td style="font-size: 24px;">${lang.flag}</td>
-            <td><strong>${lang.name}</strong></td>
-            <td><code>${lang.code}</code></td>
-            <td>${lang.description || '-'}</td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn btn-sm btn-secondary" onclick="editLanguage(${lang.id})">
-                        ✏️ Üýtget
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteLanguage(${lang.id})">
-                        🗑️ Poz
-                    </button>
-                </div>
+            <td><span class="badge">${l.id}</span></td>
+            <td class="flag-cell">${l.flag || '—'}</td>
+            <td><strong>${escHtml(l.name)}</strong></td>
+            <td><code>${escHtml(l.code)}</code></td>
+            <td class="desc-cell">${escHtml(l.description || '')}</td>
+            <td class="actions-cell">
+                <button class="btn-icon edit"   onclick="editLanguage(${l.id})" title="Üýtget">✏️</button>
+                <button class="btn-icon delete" onclick="deleteLanguage(${l.id})" title="Öçür">🗑️</button>
             </td>
         </tr>
     `).join('');
 }
 
 function showAddLanguageModal() {
-    editingItem = null;
-    document.getElementById('language-modal-title').textContent = 'Täze dil goş';
-    document.getElementById('language-name').value = '';
-    document.getElementById('language-code').value = '';
-    document.getElementById('language-flag').value = '';
-    document.getElementById('language-description').value = '';
+    editingId = null;
+    clearForm(['language-name','language-code','language-flag','language-description']);
+    setText('language-modal-title', 'Täze dil goş');
     openModal('language-modal');
 }
 
 function editLanguage(id) {
-    const language = currentData.languages.find(l => l.id === id);
-    if (!language) return;
-    
-    editingItem = language;
-    document.getElementById('language-modal-title').textContent = 'Dili üýtget';
-    document.getElementById('language-name').value = language.name;
-    document.getElementById('language-code').value = language.code;
-    document.getElementById('language-flag').value = language.flag;
-    document.getElementById('language-description').value = language.description || '';
+    const lang = allLanguages.find(l => l.id === id);
+    if (!lang) return;
+    editingId = id;
+    setVal('language-name',        lang.name);
+    setVal('language-code',        lang.code);
+    setVal('language-flag',        lang.flag || '');
+    setVal('language-description', lang.description || '');
+    setText('language-modal-title', 'Dili üýtget');
     openModal('language-modal');
 }
 
 async function saveLanguage() {
-    const data = {
-        name: document.getElementById('language-name').value,
-        code: document.getElementById('language-code').value,
-        flag: document.getElementById('language-flag').value,
-        description: document.getElementById('language-description').value
+    const body = {
+        name:        getVal('language-name').trim(),
+        code:        getVal('language-code').trim(),
+        flag:        getVal('language-flag').trim(),
+        description: getVal('language-description').trim(),
     };
-    
-    if (!data.name || !data.code) {
-        showToast('Ähli meýdanlary dolduryň!', 'error');
-        return;
-    }
-    
-    if (editingItem) {
-        // Update existing
-        const index = currentData.languages.findIndex(l => l.id === editingItem.id);
-        currentData.languages[index] = { ...editingItem, ...data };
-        showToast('Dil üýtgedildi!', 'success');
-    } else {
-        // Add new
-        const newId = Math.max(...currentData.languages.map(l => l.id), 0) + 1;
-        currentData.languages.push({ id: newId, ...data });
-        showToast('Täze dil goşuldy!', 'success');
-    }
-    
-    renderLanguagesTable();
-    populateLanguageSelects();
-    closeModal('language-modal');
-    updateDashboard();
+    if (!body.name || !body.code) { showToast('Ady we kody dolduryň', 'error'); return; }
+
+    try {
+        if (editingId) {
+            await apiFetch(`/api/languages/${editingId}`, { method: 'PUT', body: JSON.stringify(body) });
+            showToast('Dil üýtgedildi ✅');
+        } else {
+            await apiFetch('/api/languages', { method: 'POST', body: JSON.stringify(body) });
+            showToast('Täze dil goşuldy ✅');
+        }
+        closeModal('language-modal');
+        await fetchLanguages();
+        renderLanguagesTable();
+        renderDashboard();
+    } catch (_) {}
 }
 
 async function deleteLanguage(id) {
-    if (!confirm('Bu dili pozmak isleýärsiňizmi?')) return;
-    
-    currentData.languages = currentData.languages.filter(l => l.id !== id);
-    renderLanguagesTable();
-    showToast('Dil pozuldy!', 'success');
-    updateDashboard();
+    if (!confirm('Bu dili öçürmek isleýärsiňizmi?')) return;
+    try {
+        await apiFetch(`/api/languages/${id}`, { method: 'DELETE' });
+        showToast('Dil öçürildi');
+        await fetchLanguages();
+        await fetchLessons();
+        renderLanguagesTable();
+        renderDashboard();
+    } catch (_) {}
 }
 
-function populateLanguageSelects() {
-    const lessonSelect = document.getElementById('lesson-language');
-    const filterSelect = document.getElementById('lesson-language-filter');
-    
-    const options = currentData.languages.map(lang => 
-        `<option value="${lang.id}">${lang.flag} ${lang.name}</option>`
-    ).join('');
-    
-    if (lessonSelect) lessonSelect.innerHTML = options;
-    if (filterSelect) filterSelect.innerHTML = '<option value="">Ähli diller</option>' + options;
+// ──────────────────────────────────────────────
+//  LESSONS PAGE
+// ──────────────────────────────────────────────
+function renderLessonsPage() {
+    populateLanguageSelects();
+    renderLessonsTable(allLessons);
 }
 
-// ===== LESSONS =====
+async function filterLessons() {
+    const langId  = getVal('lesson-language-filter');
+    const levelId = getVal('lesson-level-filter');
 
-async function loadLessons() {
-    // In production, load from backend for each language
-    // For now, we'll display static data structure
-    currentData.lessons = [
-        { id: 1, language_id: 1, title: 'Salamlaşma', level: 'beginner', order: 1, description: 'Esasy salamlaşma' },
-        { id: 2, language_id: 1, title: 'Sanlar', level: 'beginner', order: 2, description: 'Sanlar 0-20' },
-    ];
-    renderLessonsTable();
-    populateLessonSelects();
+    let filtered = allLessons;
+    if (langId)  filtered = filtered.filter(l => String(l.language_id) === langId);
+    if (levelId) filtered = filtered.filter(l => l.level === levelId);
+    renderLessonsTable(filtered);
 }
 
-function renderLessonsTable() {
+function renderLessonsTable(lessons) {
     const tbody = document.getElementById('lessons-table-body');
-    tbody.innerHTML = currentData.lessons.map(lesson => {
-        const language = currentData.languages.find(l => l.id === lesson.language_id);
-        const exerciseCount = currentData.exercises.filter(e => e.lesson_id === lesson.id).length;
-        
-        return `
-            <tr>
-                <td>${lesson.id}</td>
-                <td><strong>${lesson.title}</strong></td>
-                <td>${language ? language.flag + ' ' + language.name : '-'}</td>
-                <td><span class="badge badge-${lesson.level}">${lesson.level}</span></td>
-                <td>${lesson.order}</td>
-                <td>${exerciseCount}</td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn btn-sm btn-secondary" onclick="editLesson(${lesson.id})">
-                            ✏️ Üýtget
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteLesson(${lesson.id})">
-                            🗑️ Poz
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
+    if (!tbody) return;
 
-function filterLessons() {
-    const languageId = parseInt(document.getElementById('lesson-language-filter').value);
-    const level = document.getElementById('lesson-level-filter').value;
-    
-    let filtered = currentData.lessons;
-    if (languageId) filtered = filtered.filter(l => l.language_id === languageId);
-    if (level) filtered = filtered.filter(l => l.level === level);
-    
-    // Re-render with filtered data
-    const tbody = document.getElementById('lessons-table-body');
-    tbody.innerHTML = filtered.map(lesson => {
-        const language = currentData.languages.find(l => l.id === lesson.language_id);
-        const exerciseCount = currentData.exercises.filter(e => e.lesson_id === lesson.id).length;
-        
+    if (!lessons.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Sapak ýok</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = lessons.map(l => {
+        const lang = allLanguages.find(x => x.id === l.language_id);
         return `
-            <tr>
-                <td>${lesson.id}</td>
-                <td><strong>${lesson.title}</strong></td>
-                <td>${language ? language.flag + ' ' + language.name : '-'}</td>
-                <td><span class="badge badge-${lesson.level}">${lesson.level}</span></td>
-                <td>${lesson.order}</td>
-                <td>${exerciseCount}</td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn btn-sm btn-secondary" onclick="editLesson(${lesson.id})">✏️</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteLesson(${lesson.id})">🗑️</button>
-                    </div>
-                </td>
-            </tr>
-        `;
+        <tr>
+            <td><span class="badge">${l.id}</span></td>
+            <td><strong>${escHtml(l.title)}</strong></td>
+            <td>${lang ? `${lang.flag || ''} ${escHtml(lang.name)}` : l.language_id}</td>
+            <td><span class="level-badge ${l.level}">${l.level}</span></td>
+            <td>${l.order_num}</td>
+            <td><span class="count-badge">${l.exercises_count ?? '—'}</span></td>
+            <td class="actions-cell">
+                <button class="btn-icon edit"   onclick="editLesson(${l.id})"   title="Üýtget">✏️</button>
+                <button class="btn-icon delete" onclick="deleteLesson(${l.id})" title="Öçür">🗑️</button>
+            </td>
+        </tr>`;
     }).join('');
 }
 
 function showAddLessonModal() {
-    editingItem = null;
-    document.getElementById('lesson-modal-title').textContent = 'Täze sapak goş';
-    document.getElementById('lesson-title').value = '';
-    document.getElementById('lesson-language').value = currentData.languages[0]?.id || '';
-    document.getElementById('lesson-level').value = 'beginner';
-    document.getElementById('lesson-order').value = currentData.lessons.length + 1;
-    document.getElementById('lesson-description').value = '';
-    document.getElementById('lesson-content').value = JSON.stringify({
-        sections: [
-            {
-                type: "text",
-                content: "Sapak mazmuny"
-            },
-            {
-                type: "vocabulary",
-                words: []
-            }
-        ]
-    }, null, 2);
+    editingId = null;
+    clearForm(['lesson-title','lesson-description','lesson-content','lesson-order']);
+    setVal('lesson-order', '1');
+    setVal('lesson-content', JSON.stringify({ sections: [] }, null, 2));
+    setText('lesson-modal-title', 'Täze sapak goş');
+    populateLanguageSelects();
     openModal('lesson-modal');
 }
 
-function editLesson(id) {
-    const lesson = currentData.lessons.find(l => l.id === id);
-    if (!lesson) return;
-    
-    editingItem = lesson;
-    document.getElementById('lesson-modal-title').textContent = 'Sapak üýtget';
-    document.getElementById('lesson-title').value = lesson.title;
-    document.getElementById('lesson-language').value = lesson.language_id;
-    document.getElementById('lesson-level').value = lesson.level;
-    document.getElementById('lesson-order').value = lesson.order;
-    document.getElementById('lesson-description').value = lesson.description || '';
-    document.getElementById('lesson-content').value = JSON.stringify(lesson.content || {sections: []}, null, 2);
-    openModal('lesson-modal');
-}
-
-function saveLesson() {
-    const data = {
-        title: document.getElementById('lesson-title').value,
-        language_id: parseInt(document.getElementById('lesson-language').value),
-        level: document.getElementById('lesson-level').value,
-        order: parseInt(document.getElementById('lesson-order').value),
-        description: document.getElementById('lesson-description').value
-    };
-    
+async function editLesson(id) {
     try {
-        data.content = JSON.parse(document.getElementById('lesson-content').value);
-    } catch (e) {
-        showToast('JSON format ýalňyş!', 'error');
-        return;
-    }
-    
-    if (!data.title) {
-        showToast('Sapagyň adyny ýazyň!', 'error');
-        return;
-    }
-    
-    if (editingItem) {
-        const index = currentData.lessons.findIndex(l => l.id === editingItem.id);
-        currentData.lessons[index] = { ...editingItem, ...data };
-        showToast('Sapak üýtgedildi!', 'success');
-    } else {
-        const newId = Math.max(...currentData.lessons.map(l => l.id), 0) + 1;
-        currentData.lessons.push({ id: newId, ...data });
-        showToast('Täze sapak goşuldy!', 'success');
-    }
-    
-    renderLessonsTable();
-    populateLessonSelects();
-    closeModal('lesson-modal');
-    updateDashboard();
+        const lesson = await apiFetch(`/api/lessons/${id}`);
+        editingId = id;
+        setVal('lesson-title',       lesson.title);
+        setVal('lesson-description', lesson.description || '');
+        setVal('lesson-level',       lesson.level);
+        setVal('lesson-order',       lesson.order_num);
+        setVal('lesson-language',    lesson.language_id);
+        setVal('lesson-content',     JSON.stringify(lesson.content || {}, null, 2));
+        setText('lesson-modal-title', 'Sapak üýtget');
+        openModal('lesson-modal');
+    } catch (_) {}
 }
 
-function deleteLesson(id) {
-    if (!confirm('Bu sapak we onuň ähli maşklary pozular!')) return;
-    
-    currentData.lessons = currentData.lessons.filter(l => l.id !== id);
-    currentData.exercises = currentData.exercises.filter(e => e.lesson_id !== id);
-    renderLessonsTable();
-    renderExercisesTable();
-    showToast('Sapak pozuldy!', 'success');
-    updateDashboard();
-}
+async function saveLesson() {
+    let content;
+    try { content = JSON.parse(getVal('lesson-content') || '{}'); }
+    catch { showToast('Content JSON formaty ýalňyş', 'error'); return; }
 
-function populateLessonSelects() {
-    const exerciseSelect = document.getElementById('exercise-lesson');
-    const filterSelect = document.getElementById('exercise-lesson-filter');
-    
-    const options = currentData.lessons.map(lesson => {
-        const lang = currentData.languages.find(l => l.id === lesson.language_id);
-        return `<option value="${lesson.id}">${lang ? lang.flag + ' ' : ''}${lesson.title}</option>`;
-    }).join('');
-    
-    if (exerciseSelect) exerciseSelect.innerHTML = options;
-    if (filterSelect) filterSelect.innerHTML = '<option value="">Ähli sapaklar</option>' + options;
-}
+    const body = {
+        language_id: parseInt(getVal('lesson-language')),
+        title:       getVal('lesson-title').trim(),
+        description: getVal('lesson-description').trim(),
+        level:       getVal('lesson-level'),
+        order_num:   parseInt(getVal('lesson-order')) || 1,
+        content,
+    };
+    if (!body.title) { showToast('Sapa adyny giriziň', 'error'); return; }
 
-// ===== EXERCISES =====
-
-async function loadExercises() {
-    currentData.exercises = [
-        { 
-            id: 1, 
-            lesson_id: 1, 
-            title: 'Hola näme diýmek?', 
-            type: 'multiple_choice',
-            difficulty: 1,
-            points: 10,
-            content: {
-                question: '"Hola" näme diýmek?',
-                options: ['Salam', 'Hoş gal', 'Sag bol'],
-                correct_answer: 'Salam',
-                hint: 'Bu salamlaşma sözi'
-            }
+    try {
+        if (editingId) {
+            await apiFetch(`/api/lessons/${editingId}`, { method: 'PUT', body: JSON.stringify(body) });
+            showToast('Sapak üýtgedildi ✅');
+        } else {
+            await apiFetch('/api/lessons', { method: 'POST', body: JSON.stringify(body) });
+            showToast('Täze sapak goşuldy ✅');
         }
-    ];
-    renderExercisesTable();
+        closeModal('lesson-modal');
+        await fetchLessons();
+        renderLessonsTable(allLessons);
+        renderDashboard();
+    } catch (_) {}
 }
 
-function renderExercisesTable() {
-    const tbody = document.getElementById('exercises-table-body');
-    tbody.innerHTML = currentData.exercises.map(exercise => {
-        const lesson = currentData.lessons.find(l => l.id === exercise.lesson_id);
-        const typeNames = {
-            'multiple_choice': 'Multiple Choice',
-            'translation': 'Translation',
-            'fill_blank': 'Fill Blank'
-        };
-        
-        return `
-            <tr>
-                <td>${exercise.id}</td>
-                <td><strong>${exercise.title}</strong></td>
-                <td>${lesson ? lesson.title : '-'}</td>
-                <td><span class="badge">${typeNames[exercise.type]}</span></td>
-                <td>${'⭐'.repeat(exercise.difficulty)}</td>
-                <td><strong>${exercise.points}</strong></td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn btn-sm btn-secondary" onclick="editExercise(${exercise.id})">
-                            ✏️ Üýtget
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteExercise(${exercise.id})">
-                            🗑️ Poz
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
+async function deleteLesson(id) {
+    if (!confirm('Bu sapak öçürilsin?')) return;
+    try {
+        await apiFetch(`/api/lessons/${id}`, { method: 'DELETE' });
+        showToast('Sapak öçürildi');
+        await fetchLessons();
+        renderLessonsTable(allLessons);
+        renderDashboard();
+    } catch (_) {}
+}
+
+// ──────────────────────────────────────────────
+//  EXERCISES PAGE
+// ──────────────────────────────────────────────
+function renderExercisesPage() {
+    populateLessonSelects();
+    renderExercisesTable(allExercises);
 }
 
 function filterExercises() {
-    const lessonId = parseInt(document.getElementById('exercise-lesson-filter').value);
-    const type = document.getElementById('exercise-type-filter').value;
-    
-    let filtered = currentData.exercises;
-    if (lessonId) filtered = filtered.filter(e => e.lesson_id === lessonId);
-    if (type) filtered = filtered.filter(e => e.type === type);
-    
-    // Re-render
+    const lessonId = getVal('exercise-lesson-filter');
+    const typeId   = getVal('exercise-type-filter');
+    let filtered = allExercises;
+    if (lessonId) filtered = filtered.filter(e => String(e.lesson_id) === lessonId);
+    if (typeId)   filtered = filtered.filter(e => e.type === typeId);
+    renderExercisesTable(filtered);
+}
+
+function renderExercisesTable(exercises) {
     const tbody = document.getElementById('exercises-table-body');
-    tbody.innerHTML = filtered.map(exercise => {
-        const lesson = currentData.lessons.find(l => l.id === exercise.lesson_id);
-        const typeNames = {
-            'multiple_choice': 'Multiple Choice',
-            'translation': 'Translation',
-            'fill_blank': 'Fill Blank'
-        };
-        
+    if (!tbody) return;
+
+    if (!exercises.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Maşk ýok</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = exercises.map(e => {
+        const lesson = allLessons.find(l => l.id === e.lesson_id);
         return `
-            <tr>
-                <td>${exercise.id}</td>
-                <td><strong>${exercise.title}</strong></td>
-                <td>${lesson ? lesson.title : '-'}</td>
-                <td><span class="badge">${typeNames[exercise.type]}</span></td>
-                <td>${'⭐'.repeat(exercise.difficulty)}</td>
-                <td><strong>${exercise.points}</strong></td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn btn-sm btn-secondary" onclick="editExercise(${exercise.id})">✏️</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteExercise(${exercise.id})">🗑️</button>
-                    </div>
-                </td>
-            </tr>
-        `;
+        <tr>
+            <td><span class="badge">${e.id}</span></td>
+            <td><strong>${escHtml(e.title)}</strong></td>
+            <td>${lesson ? escHtml(lesson.title) : e.lesson_id}</td>
+            <td><span class="type-badge ${e.type}">${e.type}</span></td>
+            <td>${'⭐'.repeat(e.difficulty || 1)}</td>
+            <td><strong>${e.points}</strong></td>
+            <td class="actions-cell">
+                <button class="btn-icon edit"   onclick="editExercise(${e.id})"   title="Üýtget">✏️</button>
+                <button class="btn-icon delete" onclick="deleteExercise(${e.id})" title="Öçür">🗑️</button>
+            </td>
+        </tr>`;
     }).join('');
 }
 
 function showAddExerciseModal() {
-    editingItem = null;
-    document.getElementById('exercise-modal-title').textContent = 'Täze maşk goş';
-    document.getElementById('exercise-lesson').value = currentData.lessons[0]?.id || '';
-    document.getElementById('exercise-type').value = 'multiple_choice';
-    document.getElementById('exercise-title').value = '';
-    document.getElementById('exercise-difficulty').value = '1';
-    document.getElementById('exercise-points').value = '10';
-    document.getElementById('exercise-question').value = '';
-    document.getElementById('exercise-options').value = '';
-    document.getElementById('exercise-answer').value = '';
-    document.getElementById('exercise-hint').value = '';
+    editingId = null;
+    clearForm(['exercise-title','exercise-question','exercise-options','exercise-answer','exercise-hint']);
+    setVal('exercise-difficulty', '1');
+    setVal('exercise-points', '10');
+    setVal('exercise-type', 'multiple_choice');
+    setText('exercise-modal-title', 'Täze maşk goş');
     updateExerciseFields();
+    populateLessonSelects();
     openModal('exercise-modal');
 }
 
-function editExercise(id) {
-    const exercise = currentData.exercises.find(e => e.id === id);
-    if (!exercise) return;
-    
-    editingItem = exercise;
-    document.getElementById('exercise-modal-title').textContent = 'Maşk üýtget';
-    document.getElementById('exercise-lesson').value = exercise.lesson_id;
-    document.getElementById('exercise-type').value = exercise.type;
-    document.getElementById('exercise-title').value = exercise.title;
-    document.getElementById('exercise-difficulty').value = exercise.difficulty;
-    document.getElementById('exercise-points').value = exercise.points;
-    document.getElementById('exercise-question').value = exercise.content.question;
-    
-    if (exercise.content.options) {
-        document.getElementById('exercise-options').value = exercise.content.options.join('\n');
-    }
-    
-    document.getElementById('exercise-answer').value = exercise.content.correct_answer;
-    document.getElementById('exercise-hint').value = exercise.content.hint || '';
-    
-    updateExerciseFields();
-    openModal('exercise-modal');
+async function editExercise(id) {
+    try {
+        const ex = await apiFetch(`/api/exercises/${id}`);
+        editingId = id;
+        const c = ex.content || {};
+        setVal('exercise-lesson',     ex.lesson_id);
+        setVal('exercise-type',       ex.type);
+        setVal('exercise-title',      ex.title);
+        setVal('exercise-difficulty', ex.difficulty);
+        setVal('exercise-points',     ex.points);
+        setVal('exercise-question',   c.question || '');
+        setVal('exercise-options',    (c.options || []).join('\n'));
+        setVal('exercise-answer',     c.correct_answer || '');
+        setVal('exercise-hint',       c.hint || '');
+        setText('exercise-modal-title', 'Maşk üýtget');
+        updateExerciseFields();
+        openModal('exercise-modal');
+    } catch (_) {}
 }
 
 function updateExerciseFields() {
-    const type = document.getElementById('exercise-type').value;
-    const optionsGroup = document.getElementById('exercise-options-group');
-    
-    if (type === 'multiple_choice') {
-        optionsGroup.style.display = 'block';
-    } else {
-        optionsGroup.style.display = 'none';
-    }
+    const type = getVal('exercise-type');
+    const group = document.getElementById('exercise-options-group');
+    if (group) group.style.display = (type === 'multiple_choice') ? '' : 'none';
 }
 
-function saveExercise() {
-    const type = document.getElementById('exercise-type').value;
-    
-    const data = {
-        lesson_id: parseInt(document.getElementById('exercise-lesson').value),
-        title: document.getElementById('exercise-title').value,
-        type: type,
-        difficulty: parseInt(document.getElementById('exercise-difficulty').value),
-        points: parseInt(document.getElementById('exercise-points').value),
-        content: {
-            question: document.getElementById('exercise-question').value,
-            correct_answer: document.getElementById('exercise-answer').value,
-            hint: document.getElementById('exercise-hint').value
+async function saveExercise() {
+    const type    = getVal('exercise-type');
+    const options = getVal('exercise-options').split('\n').map(s => s.trim()).filter(Boolean);
+
+    const content = {
+        question:       getVal('exercise-question').trim(),
+        correct_answer: getVal('exercise-answer').trim(),
+        hint:           getVal('exercise-hint').trim(),
+    };
+    if (type === 'multiple_choice') content.options = options;
+
+    const body = {
+        lesson_id:  parseInt(getVal('exercise-lesson')),
+        type,
+        title:      getVal('exercise-title').trim(),
+        difficulty: parseInt(getVal('exercise-difficulty')) || 1,
+        points:     parseInt(getVal('exercise-points')) || 10,
+        content,
+    };
+    if (!body.title || !content.question || !content.correct_answer) {
+        showToast('Ähli hökmany meýdanlary dolduryň', 'error'); return;
+    }
+
+    try {
+        if (editingId) {
+            await apiFetch(`/api/exercises/${editingId}`, { method: 'PUT', body: JSON.stringify(body) });
+            showToast('Maşk üýtgedildi ✅');
+        } else {
+            await apiFetch('/api/exercises', { method: 'POST', body: JSON.stringify(body) });
+            showToast('Täze maşk goşuldy ✅');
         }
-    };
-    
-    if (type === 'multiple_choice') {
-        const optionsText = document.getElementById('exercise-options').value;
-        data.content.options = optionsText.split('\n').filter(o => o.trim());
-    }
-    
-    if (!data.title || !data.content.question) {
-        showToast('Ähli meýdanlary dolduryň!', 'error');
-        return;
-    }
-    
-    if (editingItem) {
-        const index = currentData.exercises.findIndex(e => e.id === editingItem.id);
-        currentData.exercises[index] = { ...editingItem, ...data };
-        showToast('Maşk üýtgedildi!', 'success');
-    } else {
-        const newId = Math.max(...currentData.exercises.map(e => e.id), 0) + 1;
-        currentData.exercises.push({ id: newId, ...data });
-        showToast('Täze maşk goşuldy!', 'success');
-    }
-    
-    renderExercisesTable();
-    renderLessonsTable(); // Update exercise counts
-    closeModal('exercise-modal');
-    updateDashboard();
+        closeModal('exercise-modal');
+        await fetchExercises();
+        renderExercisesTable(allExercises);
+        renderDashboard();
+    } catch (_) {}
 }
 
-function deleteExercise(id) {
-    if (!confirm('Bu maşk pozular!')) return;
-    
-    currentData.exercises = currentData.exercises.filter(e => e.id !== id);
-    renderExercisesTable();
-    renderLessonsTable();
-    showToast('Maşk pozuldy!', 'success');
-    updateDashboard();
+async function deleteExercise(id) {
+    if (!confirm('Bu maşk öçürilsin?')) return;
+    try {
+        await apiFetch(`/api/exercises/${id}`, { method: 'DELETE' });
+        showToast('Maşk öçürildi');
+        await fetchExercises();
+        renderExercisesTable(allExercises);
+        renderDashboard();
+    } catch (_) {}
 }
 
-// ===== USERS =====
-
-async function loadUsers() {
-    // Load from backend in production
-    currentData.users = [];
-    renderUsersTable();
-}
-
-function renderUsersTable() {
+// ──────────────────────────────────────────────
+//  USERS PAGE
+// ──────────────────────────────────────────────
+async function renderUsersPage() {
     const tbody = document.getElementById('users-table-body');
-    
-    if (currentData.users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Heniz ulanyjy ýok</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = currentData.users.map(user => `
-        <tr>
-            <td>${user.id}</td>
-            <td><strong>${user.username}</strong></td>
-            <td>${user.email}</td>
-            <td>${user.native_language}</td>
-            <td>${new Date(user.created_at).toLocaleDateString()}</td>
-            <td>
-                <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})">
-                    🗑️ Poz
-                </button>
-            </td>
-        </tr>
-    `).join('');
-}
+    if (!tbody) return;
 
-// ===== VOCABULARY =====
-
-async function loadVocabulary() {
-    currentData.vocabulary = [];
-    renderVocabularyTable();
-}
-
-function renderVocabularyTable() {
-    const tbody = document.getElementById('vocabulary-table-body');
-    
-    if (currentData.vocabulary.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Heniz söz ýok</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = currentData.vocabulary.map(word => {
-        const language = currentData.languages.find(l => l.id === word.language_id);
-        return `
+    try {
+        const users = await apiFetch('/api/admin/users');
+        if (!users.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Ulanyjy ýok</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = users.map(u => `
             <tr>
-                <td>${word.id}</td>
-                <td><strong>${word.word}</strong></td>
-                <td>${word.translation}</td>
-                <td>${language ? language.flag : ''}</td>
-                <td>${word.user_id}</td>
-                <td>${'⭐'.repeat(word.mastery_level)}</td>
-                <td>
-                    <button class="btn btn-sm btn-danger" onclick="deleteVocabulary(${word.id})">
-                        🗑️ Poz
-                    </button>
+                <td><span class="badge">${u.id}</span></td>
+                <td><strong>${escHtml(u.username)}</strong></td>
+                <td>${escHtml(u.email)}</td>
+                <td>${escHtml(u.native_language || '—')}</td>
+                <td class="date-cell">${fmtDate(u.created_at)}</td>
+                <td class="actions-cell">
+                    <button class="btn-icon delete" onclick="deleteUser(${u.id})" title="Öçür">🗑️</button>
                 </td>
-            </tr>
-        `;
-    }).join('');
+            </tr>`).join('');
+    } catch (_) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Maglumatlary ýükläp bolmady</td></tr>`;
+    }
 }
 
-// ===== MODAL FUNCTIONS =====
-
-function openModal(modalId) {
-    document.getElementById(modalId).classList.add('active');
+async function deleteUser(id) {
+    if (!confirm('Bu ulanyjy öçürilsin?')) return;
+    try {
+        await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+        showToast('Ulanyjy öçürildi');
+        renderUsersPage();
+        renderDashboard();
+    } catch (_) {}
 }
 
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
+// ──────────────────────────────────────────────
+//  VOCABULARY PAGE
+// ──────────────────────────────────────────────
+async function renderVocabularyPage() {
+    const tbody = document.getElementById('vocabulary-table-body');
+    if (!tbody) return;
+
+    try {
+        const words = await apiFetch('/api/admin/vocabulary');
+        if (!words.length) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Söz ýok</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = words.map(w => {
+            const lang = allLanguages.find(l => l.id === w.language_id);
+            const stars = '⭐'.repeat(w.mastery_level || 0) || '—';
+            return `
+            <tr>
+                <td><span class="badge">${w.id}</span></td>
+                <td><strong>${escHtml(w.word)}</strong></td>
+                <td>${escHtml(w.translation)}</td>
+                <td>${lang ? `${lang.flag || ''} ${escHtml(lang.name)}` : w.language_id}</td>
+                <td>${escHtml(w.username || String(w.user_id))}</td>
+                <td>${stars}</td>
+                <td class="actions-cell">
+                    <button class="btn-icon delete" onclick="deleteVocabWord(${w.id})" title="Öçür">🗑️</button>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch (_) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Maglumatlary ýükläp bolmady</td></tr>`;
+    }
 }
 
-// ===== TOAST =====
-
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast ${type} show`;
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
+async function deleteVocabWord(id) {
+    if (!confirm('Bu söz öçürilsin?')) return;
+    try {
+        await apiFetch(`/api/admin/vocabulary/${id}`, { method: 'DELETE' });
+        showToast('Söz öçürildi');
+        renderVocabularyPage();
+    } catch (_) {}
 }
 
-// Export data (for saving to backend)
-function exportData() {
-    const data = {
-        languages: currentData.languages,
-        lessons: currentData.lessons,
-        exercises: currentData.exercises
-    };
-    
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'admin-data.json';
-    a.click();
-    
-    showToast('Maglumat export edildi!', 'success');
+// ──────────────────────────────────────────────
+//  MODAL HELPERS
+// ──────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); editingId = null; }
+
+// Close on backdrop click
+document.addEventListener('click', e => {
+    if (e.target.classList.contains('modal')) closeModal(e.target.id);
+});
+
+// ──────────────────────────────────────────────
+//  TOAST
+// ──────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
+
+// ──────────────────────────────────────────────
+//  TINY UTILS
+// ──────────────────────────────────────────────
+function getVal(id)         { return (document.getElementById(id)?.value ?? ''); }
+function setVal(id, v)      { const el = document.getElementById(id); if (el) el.value = v ?? ''; }
+function setText(id, v)     { const el = document.getElementById(id); if (el) el.textContent = v ?? ''; }
+function clearForm(ids)     { ids.forEach(id => setVal(id, '')); }
+function escHtml(str = '')  { return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(iso)       { if (!iso) return '—'; try { return new Date(iso).toLocaleDateString('tk-TK'); } catch { return iso; } }
